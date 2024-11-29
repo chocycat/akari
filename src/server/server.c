@@ -7,23 +7,25 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include "../common/protocol.h"
+#include "connection.h"
+
 #define SOCKET_ADDR "/tmp/nostrum.sock"
 #define BACKLOG_SIZE 2048
-#define BUFFER_SIZE 1024
 
-void *handle_client(void *cfd) {
+void *handle_client(int *cfd, struct ConnectionManager *cman) {
   int fd = *(int *)cfd;
-  char buffer[BUFFER_SIZE];
-  int n;
+  struct Connection *conn = conn_new(fd);
+  conn_append(cman, conn);
 
-  // handle requests from the client
-  while ((n = read(fd, buffer, sizeof(buffer))) > 0) {
-    buffer[n] = '\0'; // null termination is needed here
-    printf("Received: %s\n", buffer);
+  while (1) {
+    struct Message *msg = conn_read(conn);
+    if (msg == NULL)
+      continue;
+
+    printf("Got message: %d\n", msg->header.type);
   }
 
-  close(fd);
-  free(cfd);
   return NULL;
 }
 

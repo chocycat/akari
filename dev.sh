@@ -8,7 +8,7 @@ if [ ! -d "$BUILD_DIR" ]; then
   echo "Setup"
   echo "-----"
 
-  meson setup "$BUILD_DIR"
+  meson setup "$BUILD_DIR" -Dexamples=true
 fi
 
 echo

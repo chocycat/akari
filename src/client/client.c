@@ -38,7 +38,6 @@ struct Client *client_connect(const char *socket_addr) {
 
   struct MessageRegisterClient msg_reg = {.pid = getpid(), .flags = 0};
 
-  printf("size: %zu\n", sizeof(msg_reg));
   if (!client_write(client, REGISTER_CLIENT, &msg_reg, sizeof(msg_reg))) {
     printf("err: failed to write message\n");
     return NULL;

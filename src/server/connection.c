@@ -163,8 +163,6 @@ struct Message *conn_read(struct Connection *conn) {
   // check if the message is complete
   if (conn->recv_buffer->used < sizeof(struct MessageHeader)) {
     printf("[DEB] Waiting for message\n");
-    printf("mh size: %lu, used: %lu\n", sizeof(struct MessageHeader),
-           conn->recv_buffer->used);
     return NULL; // no(t yet)
   }
 

@@ -9,6 +9,7 @@
 
 #include "../common/message.h"
 #include "connection.h"
+#include "src/common/message_payload.h"
 
 #define SOCKET_ADDR "/tmp/nostrum.sock"
 #define BACKLOG_SIZE 2048
@@ -18,15 +19,17 @@ struct HandleClientArgs {
   struct ConnectionManager *cman;
 };
 
-void *handle_client(void *arg) {
+void *handle_connection(void *arg) {
   struct HandleClientArgs *args = (struct HandleClientArgs *)arg;
   int fd = *(int *)args->fd;
   struct Connection *conn = conn_new(fd);
-  conn_append(args->cman, conn);
+  if (!conn_append(args->cman, conn)) {
+    printf("[ERR] Failed to append connection\n");
+    return NULL;
+  };
 
   while (1) {
     if (conn->state == CONN_STATE_CLOSED) {
-      printf("Closed");
       break;
     } else if (conn->state == CONN_STATE_WAITING) {
       printf("[DEB] Waiting\n");
@@ -37,7 +40,29 @@ void *handle_client(void *arg) {
     if (msg == NULL)
       continue;
 
-    printf("Got message: %d\n", msg->header.type);
+    uint16_t type = msg->header.type;
+    switch (type) {
+    case M_REGISTER_CLIENT: {
+      struct MessageRegisterClient *req =
+          (struct MessageRegisterClient *)msg->payload;
+
+      conn->type = CLIENT_TYPE_APP;
+      conn->pid = req->pid;
+
+      struct MessageHeader *header = malloc(sizeof(struct MessageHeader *));
+      message_header(header, M_REGISTER_CLIENT_ACK,
+                     sizeof(struct MessageRegisterClientAck), conn->id);
+      buffer_write(conn->send_buffer, header, sizeof(struct MessageHeader));
+
+      struct MessageRegisterClientAck msg_ack = {.client_id = conn->id};
+      buffer_write(conn->send_buffer, &msg_ack,
+                   sizeof(struct MessageRegisterClientAck));
+
+      conn_write(conn);
+
+      break;
+    }
+    }
   }
 
   return NULL;
@@ -98,7 +123,7 @@ int main(int argc, char *argv[]) {
     pthread_t tid;
     struct HandleClientArgs args = {nfd, cman};
 
-    if (pthread_create(&tid, NULL, handle_client, (void *)&args) != 0) {
+    if (pthread_create(&tid, NULL, handle_connection, (void *)&args) != 0) {
       printf("[WRN] Failed to spawn thread for a client: %s\n",
              strerror(errno));
       free(nfd);

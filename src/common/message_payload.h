@@ -6,5 +6,8 @@
 
 struct MessageRegisterClient {
   pid_t pid;
-  uint32_t flags;
+} __attribute__((packed));
+
+struct MessageRegisterClientAck {
+  uint32_t client_id;
 } __attribute__((packed));

@@ -2,12 +2,11 @@
 
 #include "../common/buffer.h"
 #include "../common/message.h"
-#include "../common/message_payload.h"
 
 struct Client {
   int fd;
-  struct CircularBuffer recv_buffer;
-  struct CircularBuffer send_buffer;
+  struct CircularBuffer *recv_buffer;
+  struct CircularBuffer *send_buffer;
   uint32_t client_id;
 };
 

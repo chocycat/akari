@@ -4,13 +4,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #define INITIAL_CONNECTIONS 8 // This should be promptly resized during runtime
 #define MAX_CONNECTIONS                                                        \
   1024 // Realistically, no one is gonna run 1024 GUI clients
-
-static uint32_t next_id = 1;
 
 struct ConnectionManager *cman_new(void) {
   struct ConnectionManager *cman = malloc(sizeof(*cman));
@@ -25,6 +24,7 @@ struct ConnectionManager *cman_new(void) {
 
   cman->count = 0;
   cman->capacity = INITIAL_CONNECTIONS;
+  cman->next_id = 1;
 
   return cman;
 }
@@ -72,11 +72,11 @@ bool conn_append(struct ConnectionManager *cman, struct Connection *conn) {
   if (cman->count >= MAX_CONNECTIONS)
     return false;
 
-  conn->id = next_id++;
+  conn->id = cman->next_id++;
 
   // wraparound
-  if (next_id == 0)
-    next_id = 1;
+  if (cman->next_id == 0)
+    cman->next_id = 1;
 
   cman->connections[cman->count++] = conn;
   conn->state = CONN_STATE_OPEN;
@@ -93,7 +93,7 @@ struct Connection *conn_new(int fd) {
   conn->type = CLIENT_TYPE_UNKNOWN; // yet to register
   conn->state = CONN_STATE_WAITING;
   conn->pid = -1; // yet to set one
-  conn->id = next_id++;
+  conn->id = 0;   // will be set when added to a cman
 
   // create buffers
   conn->recv_buffer = buffer_new();
@@ -132,12 +132,12 @@ void conn_close(struct ConnectionManager *cman, struct Connection *conn) {
 struct Message *conn_read(struct Connection *conn) {
   // temporary reserve buffer
   uint8_t tbuf[8192];
+
   ssize_t n = read(conn->fd, tbuf, sizeof(tbuf));
 
   if (n < 0) {
     // there's no more data
     if (errno == EAGAIN || errno == EWOULDBLOCK) {
-      printf("[WAR] No more data\n");
       return NULL;
     }
 
@@ -208,6 +208,7 @@ void conn_write(struct Connection *conn) {
     // write to fd
     ssize_t n = write(
         conn->fd, conn->send_buffer->data + conn->send_buffer->read_pos, left);
+    printf("wrote: %zd\n", n);
 
     if (n < 0) {
       if (errno == EAGAIN || errno == EWOULDBLOCK)

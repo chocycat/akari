@@ -28,6 +28,7 @@ struct ConnectionManager {
   struct Connection **connections;
   size_t count;
   size_t capacity;
+  uint32_t next_id;
 };
 
 struct ConnectionManager *cman_new(void);

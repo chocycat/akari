@@ -1,5 +1,6 @@
 #pragma once
 
+#include "buffer.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -39,7 +40,7 @@ enum MessageType {
 
 struct MessageHeader {
   uint16_t type;      // Message Type
-  uint16_t length;    // Payload length
+  uint16_t size;      // Payload size
   uint32_t client_id; // Sender or recipient ID
 } __attribute__((packed));
 
@@ -47,3 +48,14 @@ struct Message {
   struct MessageHeader header;
   uint8_t *payload; // Array
 } __attribute__((packed));
+
+static inline size_t message_size(uint16_t type, size_t size) {
+  return sizeof(struct MessageHeader) + size;
+}
+
+static inline void message_header(struct MessageHeader *header, uint16_t type,
+                                  uint16_t size, uint32_t client_id) {
+  header->type = type;
+  header->size = size;
+  header->client_id = client_id;
+}

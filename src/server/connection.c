@@ -1,9 +1,7 @@
 #include "connection.h"
-#include "buffer.h"
-#include "src/common/protocol.h"
-#include "src/server/buffer.h"
-#include <cmath>
+#include "../common/message.h"
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -82,6 +80,8 @@ bool conn_append(struct ConnectionManager *cman, struct Connection *conn) {
 
   cman->connections[cman->count++] = conn;
   conn->state = CONN_STATE_OPEN;
+
+  return true;
 }
 
 struct Connection *conn_new(int fd) {
@@ -132,67 +132,70 @@ void conn_close(struct ConnectionManager *cman, struct Connection *conn) {
 struct Message *conn_read(struct Connection *conn) {
   // temporary reserve buffer
   uint8_t tbuf[8192];
+  ssize_t n = read(conn->fd, tbuf, sizeof(tbuf));
 
-  while (1) {
-    ssize_t n = read(conn->fd, tbuf, sizeof(tbuf));
-
-    if (n < 0) {
-      // there's no more data
-      if (errno == EAGAIN || errno == EWOULDBLOCK)
-        return NULL;
-
-      // error
+  if (n < 0) {
+    // there's no more data
+    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+      printf("[WAR] No more data\n");
       return NULL;
     }
 
-    // connection is closed
-    if (n == 0) {
-      conn->state = CONN_STATE_CLOSED;
-      return NULL;
-    }
-
-    // buffer is full
-    // usually means invalid or unsupported data
-    if (buffer_read(conn->recv_buffer, tbuf, n) < 0)
-      return NULL;
-
-    // check if the message is complete
-    if (conn->recv_buffer->used < sizeof(struct MessageHeader))
-      return NULL; // no(t yet)
-
-    struct MessageHeader header;
-    memcpy(&header, conn->recv_buffer->data + conn->recv_buffer->read_pos,
-           sizeof(header));
-
-    // get message size
-    size_t size = sizeof(header) + header.length;
-
-    if (conn->recv_buffer->used < size)
-      break; // not enough data
-
-    // read complete message
-    struct Message *msg = malloc(sizeof(struct Message));
-    if (!msg)
-      return NULL;
-
-    // read header
-    buffer_read(conn->recv_buffer, &msg->header, sizeof(struct MessageHeader));
-
-    if (header.length > 0) {
-      // allocate enough resources for the entire message
-      msg->payload = malloc(header.length);
-      if (!msg->payload) {
-        free(msg);
-        return NULL;
-      }
-
-      buffer_read(conn->recv_buffer, msg->payload, header.length);
-    } else {
-      msg->payload = NULL;
-    }
-
-    return msg;
+    // error
+    printf("[ERR] %s\n", strerror(errno));
+    return NULL;
   }
+
+  // connection is closed
+  if (n == 0) {
+    conn->state = CONN_STATE_CLOSED;
+    printf("[INF] Connection closed\n");
+    return NULL;
+  }
+
+  // buffer is full
+  // usually means invalid or unsupported data
+  if (buffer_write(conn->recv_buffer, tbuf, n) < 0) {
+    printf("[WAR] Buffer is full\n");
+    return NULL;
+  }
+
+  // check if the message is complete
+  if (conn->recv_buffer->used < sizeof(struct MessageHeader)) {
+    printf("[DEB] Waiting for message\n");
+    printf("mh size: %lu, used: %lu\n", sizeof(struct MessageHeader),
+           conn->recv_buffer->used);
+    return NULL; // no(t yet)
+  }
+
+  // read header
+  struct MessageHeader header;
+  buffer_read(conn->recv_buffer, &header, sizeof(struct MessageHeader));
+
+  // read complete message
+  struct Message *msg = malloc(sizeof(struct Message));
+  if (!msg) {
+    printf("[ERR] Failed to allocate message\n");
+    return NULL;
+  }
+
+  msg->header = header;
+
+  if (header.size > 0) {
+    // allocate enough resources for the entire message
+    msg->payload = malloc(header.size);
+    if (!msg->payload) {
+      free(msg);
+      printf("[ERR] Failed to allocate message payload\n");
+      return NULL;
+    }
+
+    buffer_read(conn->recv_buffer, msg->payload, header.size);
+  } else {
+    msg->payload = NULL;
+  }
+
+  return msg;
 }
 
 void conn_write(struct Connection *conn) {

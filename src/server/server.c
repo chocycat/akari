@@ -7,18 +7,32 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#include "../common/protocol.h"
+#include "../common/message.h"
 #include "connection.h"
 
 #define SOCKET_ADDR "/tmp/nostrum.sock"
 #define BACKLOG_SIZE 2048
 
-void *handle_client(int *cfd, struct ConnectionManager *cman) {
-  int fd = *(int *)cfd;
+struct HandleClientArgs {
+  int *fd;
+  struct ConnectionManager *cman;
+};
+
+void *handle_client(void *arg) {
+  struct HandleClientArgs *args = (struct HandleClientArgs *)arg;
+  int fd = *(int *)args->fd;
   struct Connection *conn = conn_new(fd);
-  conn_append(cman, conn);
+  conn_append(args->cman, conn);
 
   while (1) {
+    if (conn->state == CONN_STATE_CLOSED) {
+      printf("Closed");
+      break;
+    } else if (conn->state == CONN_STATE_WAITING) {
+      printf("[DEB] Waiting\n");
+      continue;
+    }
+
     struct Message *msg = conn_read(conn);
     if (msg == NULL)
       continue;
@@ -32,7 +46,6 @@ void *handle_client(int *cfd, struct ConnectionManager *cman) {
 int main(int argc, char *argv[]) {
   /// The socket file descriptors
   int sfd = -1, cfd = -1, *nfd;
-  struct sockaddr_un saddr;
 
   /// Client socket length
   socklen_t clen;
@@ -47,7 +60,7 @@ int main(int argc, char *argv[]) {
   }
 
   // define sockaddr
-  saddr.sun_family = AF_UNIX;
+  struct sockaddr_un saddr = {.sun_family = AF_UNIX};
   strcpy(saddr.sun_path, SOCKET_ADDR);
 
   // bind the socket
@@ -66,6 +79,8 @@ int main(int argc, char *argv[]) {
 
   printf("[INF] Server is listening on %s\n", SOCKET_ADDR);
 
+  struct ConnectionManager *cman = cman_new();
+
   // main loop
   while (1) {
     clen = sizeof(struct sockaddr_un);
@@ -81,7 +96,9 @@ int main(int argc, char *argv[]) {
 
     // create a new thread for the client
     pthread_t tid;
-    if (pthread_create(&tid, NULL, handle_client, (void *)nfd) != 0) {
+    struct HandleClientArgs args = {nfd, cman};
+
+    if (pthread_create(&tid, NULL, handle_client, (void *)&args) != 0) {
       printf("[WRN] Failed to spawn thread for a client: %s\n",
              strerror(errno));
       free(nfd);

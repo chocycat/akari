@@ -2,9 +2,15 @@ project('nostrum', 'c')
 
 enable_examples = get_option('examples')
 
-# main
-source = 'src/server/server.c'
-executable('nostrum', source)
+sources = files(
+  'src/client/client.c',
+
+  'src/common/buffer.c',
+
+  'src/server/connection.c',
+)
+
+executable('nostrum', sources: ['src/server/server.c', sources])
 
 # examples
 if enable_examples

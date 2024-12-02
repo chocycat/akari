@@ -1,4 +1,5 @@
 #include "buffer.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -28,8 +29,8 @@ struct CircularBuffer *buffer_new(void) {
 }
 
 void buffer_destroy(struct CircularBuffer *buf) {
-  free(buf);
   free(buf->data);
+  free(buf);
   return;
 }
 
@@ -38,8 +39,9 @@ bool ensure_space(struct CircularBuffer *buf, size_t needed) {
     return false;
 
   // check if we already have enough space
-  if (buf->used + needed <= buf->capacity)
-    return false;
+  if (buf->used + needed <= buf->capacity) {
+    return true;
+  }
 
   // we need to resize the buffer
   size_t ncapacity = buf->capacity * 2;
@@ -50,12 +52,14 @@ bool ensure_space(struct CircularBuffer *buf, size_t needed) {
   if (ncapacity > MAX_BUFFER_SIZE)
     ncapacity = MAX_BUFFER_SIZE;
 
-  if (buf->used + needed > ncapacity)
+  if (buf->used + needed > ncapacity) {
     return false;
+  }
 
   uint8_t *data = malloc(ncapacity);
-  if (!data)
+  if (!data) {
     return false;
+  }
 
   // copy the existing data, wrap-around
   if (buf->write_pos > buf->read_pos) {
@@ -81,8 +85,10 @@ bool ensure_space(struct CircularBuffer *buf, size_t needed) {
 ssize_t buffer_write(struct CircularBuffer *buf, const void *data, size_t len) {
   if (!buf || !data || len == 0)
     return -1;
-  if (!ensure_space(buf, len))
+  if (!ensure_space(buf, len)) {
+    printf("%zu", len);
     return -1;
+  }
 
   size_t space = buf->capacity - buf->write_pos;
 
@@ -105,6 +111,7 @@ ssize_t buffer_write(struct CircularBuffer *buf, const void *data, size_t len) {
 ssize_t buffer_read(struct CircularBuffer *buf, void *data, size_t len) {
   if (!buf || !data || len == 0)
     return 0;
+
   if (buf->used == 0)
     return 0;
 
@@ -119,8 +126,9 @@ ssize_t buffer_read(struct CircularBuffer *buf, void *data, size_t len) {
     buf->read_pos = len - space;
   }
 
-  if (buf->read_pos >= buf->capacity)
+  if (buf->read_pos >= buf->capacity) {
     buf->read_pos = 0;
+  }
 
   buf->used -= len;
   return len;

@@ -6,6 +6,7 @@ sources = files(
   'src/client/client.c',
 
   'src/common/buffer.c',
+  'src/common/message.c',
 
   'src/server/connection.c',
 )

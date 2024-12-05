@@ -11,3 +11,8 @@ struct MessageRegisterClient {
 struct MessageRegisterClientAck {
   uint32_t client_id;
 } __attribute__((packed));
+
+struct MessageRegisterManager {
+  pid_t pid;
+  char *name;
+} __attribute__((packed));

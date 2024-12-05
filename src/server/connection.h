@@ -19,6 +19,7 @@ struct Connection {
   int fd;
   enum ConnectionType type;
   enum ConnectionState state;
+
   pid_t pid;
   struct CircularBuffer *recv_buffer;
   struct CircularBuffer *send_buffer;
@@ -37,4 +38,3 @@ bool conn_append(struct ConnectionManager *cman, struct Connection *conn);
 struct Connection *conn_new(int fd);
 void conn_close(struct ConnectionManager *cman, struct Connection *conn);
 struct Message *conn_read(struct Connection *conn);
-void conn_write(struct Connection *conn);

@@ -51,14 +51,11 @@ void *handle_connection(void *arg) {
 
       struct MessageHeader *header = malloc(sizeof(struct MessageHeader *));
       message_header(header, M_REGISTER_CLIENT_ACK,
-                     sizeof(struct MessageRegisterClientAck), conn->id);
-      buffer_write(conn->send_buffer, header, sizeof(struct MessageHeader));
-
+                     sizeof(struct MessageRegisterClientAck));
       struct MessageRegisterClientAck msg_ack = {.client_id = conn->id};
-      buffer_write(conn->send_buffer, &msg_ack,
-                   sizeof(struct MessageRegisterClientAck));
-
-      conn_write(conn);
+      message_send(conn->fd, conn->send_buffer, header, &msg_ack,
+                   sizeof(msg_ack));
+      free(header);
 
       break;
     }

@@ -130,98 +130,15 @@ void conn_close(struct ConnectionManager *cman, struct Connection *conn) {
 }
 
 struct Message *conn_read(struct Connection *conn) {
-  // temporary reserve buffer
-  uint8_t tbuf[8192];
-
-  ssize_t n = read(conn->fd, tbuf, sizeof(tbuf));
-
-  if (n < 0) {
-    // there's no more data
-    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-      return NULL;
-    }
-
-    // error
-    printf("[ERR] %s\n", strerror(errno));
-    return NULL;
-  }
+  int err = 0;
+  struct Message *msg = message_read(conn->fd, conn->recv_buffer, &err);
 
   // connection is closed
-  if (n == 0) {
+  if (err == -1) {
     conn->state = CONN_STATE_CLOSED;
     printf("[INF] Connection closed\n");
     return NULL;
   }
 
-  // buffer is full
-  // usually means invalid or unsupported data
-  if (buffer_write(conn->recv_buffer, tbuf, n) < 0) {
-    printf("[WAR] Buffer is full\n");
-    return NULL;
-  }
-
-  // check if the message is complete
-  if (conn->recv_buffer->used < sizeof(struct MessageHeader)) {
-    printf("[DEB] Waiting for message\n");
-    return NULL; // no(t yet)
-  }
-
-  // read header
-  struct MessageHeader header;
-  buffer_read(conn->recv_buffer, &header, sizeof(struct MessageHeader));
-
-  // read complete message
-  struct Message *msg = malloc(sizeof(struct Message));
-  if (!msg) {
-    printf("[ERR] Failed to allocate message\n");
-    return NULL;
-  }
-
-  msg->header = header;
-
-  if (header.size > 0) {
-    // allocate enough resources for the entire message
-    msg->payload = malloc(header.size);
-    if (!msg->payload) {
-      free(msg);
-      printf("[ERR] Failed to allocate message payload\n");
-      return NULL;
-    }
-
-    buffer_read(conn->recv_buffer, msg->payload, header.size);
-  } else {
-    msg->payload = NULL;
-  }
-
   return msg;
-}
-
-void conn_write(struct Connection *conn) {
-  while (conn->send_buffer->used > 0) {
-    size_t space = conn->send_buffer->capacity - conn->send_buffer->read_pos;
-    size_t left = conn->send_buffer->used;
-
-    // normalize
-    if (left > space)
-      left = space;
-
-    // write to fd
-    ssize_t n = write(
-        conn->fd, conn->send_buffer->data + conn->send_buffer->read_pos, left);
-    printf("wrote: %zd\n", n);
-
-    if (n < 0) {
-      if (errno == EAGAIN || errno == EWOULDBLOCK)
-        return;
-
-      // error
-      return;
-    }
-
-    conn->send_buffer->read_pos += n;
-    conn->send_buffer->used -= n;
-
-    if (conn->send_buffer->read_pos >= conn->send_buffer->capacity)
-      conn->send_buffer->read_pos = 0;
-  }
 }

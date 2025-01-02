@@ -8,8 +8,8 @@ Akari is structured around several key components that work together to create a
 
 Akari has adopted some terminology that may be unknown to readers:
 
-- **Clients** is a collective term for the _controller_, _apps_ and _managers_.
-- **Display System** refers to the environment Akari is in as a whole. This includes all of the clients.
+- **Display System** refers to the environment Akari is in as a whole. This includes the _controller_ all of the _clients_.
+- **Clients** is a collective term for _apps_ and _managers_.
 
 Below is an overview of the main components, their functions and how they interact with eachother.
 

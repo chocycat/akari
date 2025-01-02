@@ -6,7 +6,7 @@ sources = files(
   'src/logger/logger.cc',
 )
 
-executable('akari', sources: ['src/server/server.cc', sources])
+executable('akari', sources: ['src/controller/controller.cc', sources])
 
 # examples
 if enable_examples
